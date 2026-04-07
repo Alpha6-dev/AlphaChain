@@ -1,0 +1,156 @@
+Organizations:
+  - &OrdererOrg
+    Name: OrdererOrg
+    ID: OrdererMSP
+    MSPDir: ../crypto-config/ordererOrganizations/alphachain.com/msp
+    Policies:
+      Readers:
+        Type: Signature
+        Rule: "OR('OrdererMSP.member')"
+      Writers:
+        Type: Signature
+        Rule: "OR('OrdererMSP.member')"
+      Admins:
+        Type: Signature
+        Rule: "OR('OrdererMSP.admin')"
+    OrdererEndpoints:
+      - orderer.alphachain.com:7050
+
+  - &AlphaOrg
+    Name: AlphaOrgMSP
+    ID: AlphaOrgMSP
+    MSPDir: ../crypto-config/peerOrganizations/alpha.alphachain.com/msp
+    Policies:
+      Readers:
+        Type: Signature
+        Rule: "OR('AlphaOrgMSP.admin', 'AlphaOrgMSP.peer', 'AlphaOrgMSP.client')"
+      Writers:
+        Type: Signature
+        Rule: "OR('AlphaOrgMSP.admin', 'AlphaOrgMSP.client')"
+      Admins:
+        Type: Signature
+        Rule: "OR('AlphaOrgMSP.admin')"
+      Endorsement:
+        Type: Signature
+        Rule: "OR('AlphaOrgMSP.peer')"
+    AnchorPeers:
+      - Host: peer0.alpha.alphachain.com
+        Port: 7051
+
+  - &CustomsOrg
+    Name: CustomsOrgMSP
+    ID: CustomsOrgMSP
+    MSPDir: ../crypto-config/peerOrganizations/customs.alphachain.com/msp
+    Policies:
+      Readers:
+        Type: Signature
+        Rule: "OR('CustomsOrgMSP.admin', 'CustomsOrgMSP.peer', 'CustomsOrgMSP.client')"
+      Writers:
+        Type: Signature
+        Rule: "OR('CustomsOrgMSP.admin', 'CustomsOrgMSP.client')"
+      Admins:
+        Type: Signature
+        Rule: "OR('CustomsOrgMSP.admin')"
+      Endorsement:
+        Type: Signature
+        Rule: "OR('CustomsOrgMSP.peer')"
+    AnchorPeers:
+      - Host: peer0.customs.alphachain.com
+        Port: 9051
+
+Capabilities:
+  Channel: &ChannelCapabilities
+    V2_0: true
+  Orderer: &OrdererCapabilities
+    V2_0: true
+  Application: &ApplicationCapabilities
+    V2_0: true
+
+Application: &ApplicationDefaults
+  Organizations:
+  Policies:
+    Readers:
+      Type: ImplicitMeta
+      Rule: "ANY Readers"
+    Writers:
+      Type: ImplicitMeta
+      Rule: "ANY Writers"
+    Admins:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Admins"
+    LifecycleEndorsement:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Endorsement"
+    Endorsement:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Endorsement"
+  Capabilities:
+    <<: *ApplicationCapabilities
+
+Orderer: &OrdererDefaults
+  OrdererType: etcdraft
+  Addresses:
+    - orderer.alphachain.com:7050
+  BatchTimeout: 2s
+  BatchSize:
+    MaxMessageCount: 10
+    AbsoluteMaxBytes: 99 MB
+    PreferredMaxBytes: 512 KB
+  EtcdRaft:
+    Consenters:
+      - Host: orderer.alphachain.com
+        Port: 7050
+        ClientTLSCert: ../crypto-config/ordererOrganizations/alphachain.com/orderers/orderer.alphachain.com/tls/server.crt
+        ServerTLSCert: ../crypto-config/ordererOrganizations/alphachain.com/orderers/orderer.alphachain.com/tls/server.crt
+  Organizations:
+  Policies:
+    Readers:
+      Type: ImplicitMeta
+      Rule: "ANY Readers"
+    Writers:
+      Type: ImplicitMeta
+      Rule: "ANY Writers"
+    Admins:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Admins"
+    BlockValidation:
+      Type: ImplicitMeta
+      Rule: "ANY Writers"
+  Capabilities:
+    <<: *OrdererCapabilities
+
+Channel: &ChannelDefaults
+  Policies:
+    Readers:
+      Type: ImplicitMeta
+      Rule: "ANY Readers"
+    Writers:
+      Type: ImplicitMeta
+      Rule: "ANY Writers"
+    Admins:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Admins"
+  Capabilities:
+    <<: *ChannelCapabilities
+
+Profiles:
+  AlphaChainGenesis:
+    <<: *ChannelDefaults
+    Orderer:
+      <<: *OrdererDefaults
+      Organizations:
+        - *OrdererOrg
+    Application:
+      <<: *ApplicationDefaults
+      Organizations:
+        - *AlphaOrg
+        - *CustomsOrg
+
+  AlphaChannel:
+    Consortium: AlphaChainConsortium
+    <<: *ChannelDefaults
+    Application:
+      <<: *ApplicationDefaults
+      Organizations:
+        - *AlphaOrg
+        - *CustomsOrg

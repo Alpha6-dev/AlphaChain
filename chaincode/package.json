@@ -1,0 +1,20 @@
+{
+  "name": "alphachain-chaincode",
+  "version": "1.0.0",
+  "description": "AlphaChain shipment lifecycle smart contract for Hyperledger Fabric",
+  "main": "index.js",
+  "scripts": {
+    "start": "fabric-chaincode-node start",
+    "test": "jest --coverage"
+  },
+  "dependencies": {
+    "fabric-contract-api": "^2.5.0",
+    "fabric-shim": "^2.5.0"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
