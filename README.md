@@ -1,100 +1,151 @@
 # AlphaChain
 
-**Blockchain logistics platform for West Africa** — built on Hyperledger Fabric 2.5.
+Blockchain logistics platform for West Africa — built on Hyperledger Fabric 2.5.
 
 Alpha 6 | Dakar, Senegal
 
----
+## What this repo contains
 
-## Overview
+AlphaChain provides end-to-end shipment lifecycle tracking on an immutable ledger, plus:
 
-AlphaChain provides end-to-end shipment tracking on an immutable ledger, with auto-release payments on delivery confirmation and a utility token (ACT) for transaction fees.
+- auto-release payment when delivery is confirmed by an authorized party
+- a utility token (ACT) for transaction fees / incentives
+- an off-chain index (PostgreSQL) to power API + dashboard search
+- a React dashboard for stakeholders
 
-**Phase 1 Pilot**: China to Dakar athletic gear import.
+Phase 1 pilot: China → Dakar athletic gear import.
 
 ## Architecture
 
 ```
 alphachain/
-  chaincode/     Fabric smart contracts (shipment lifecycle)
-  api/           Node.js + Express REST API (fabric-network SDK)
+  chaincode/     Fabric smart contracts (shipment + ACT token, Node.js chaincode)
+  api/           Node.js + Express REST API
   dashboard/     React 18 + Tailwind CSS stakeholder dashboard
-  network/       Fabric network config (docker-compose, crypto, channels)
+  network/       Fabric network config (docker-compose + scripts)
   token/         AlphaChain Token (ACT) chaincode
 ```
 
-## Tech Stack
+## Modules (high level)
 
-| Layer | Technology |
-|-------|-----------|
-| Blockchain | Hyperledger Fabric 2.5 |
-| Smart Contracts | JavaScript (fabric-contract-api) |
-| Backend | Node.js + Express + fabric-network SDK |
-| Frontend | React 18 + Tailwind CSS + Recharts |
-| Database | PostgreSQL (off-chain metadata) |
-| Infrastructure | Docker + docker-compose |
+### chaincode/
+Node.js Fabric chaincode (see `chaincode/README.md`):
 
-## Network Topology
+- CreateShipment — register a new shipment
+- UpdateShipmentStatus — update shipment status with custody change events
+- ConfirmDelivery — mark delivered; triggers payment release
+- GetShipment / GetShipmentHistory
 
-- **Organizations**: AlphaOrg (MSP: AlphaOrgMSP), CustomsOrg (MSP: CustomsOrgMSP)
-- **Orderer**: orderer.alphachain.com (Raft consensus)
-- **Channel**: alphachannel
-- **State DB**: CouchDB (rich queries)
+### token/
+Node.js token chaincode using the Hyperledger Fabric Token SDK (see `token/README.md`):
 
-## Quick Start
+- ACT utility token (AlphaChain Token)
+- Mint / Transfer / BalanceOf
 
-```bash
-# 1. Copy environment config
-cp .env.example .env
+### api/
+Express REST API bridging the chaincode to web clients (see `api/README.md`):
 
-# 2. Start the Fabric network
-cd network/scripts
-./start-network.sh
+- wallet-based Fabric client (`FABRIC_WALLET_PATH`)
+- uses `connection-profile.json` + `FABRIC_MSP_ID`
+- rate limiting + structured logging
 
-# 3. Deploy chaincode
-./deploy-chaincode.sh
+Key endpoints (most used by the dashboard):
 
-# 4. Start the API server
-cd ../../api
+- POST /api/shipments
+- GET /api/shipments/:id
+- PUT /api/shipments/:id/status
+- POST /api/shipments/:id/confirm
+- GET /api/shipments/:id/history
+- GET /api/shipments/:id/qrcode
+
+### dashboard/
+React stakeholder dashboard consuming the API; shows shipment list, detail, status timeline, and QR code scanning info. Configure API base URL via environment.
+
+### network/
+Hyperledger Fabric 2.5 dev network (see `network/README.md`):
+
+- Orgs: AlphaOrg (MSP: AlphaOrgMSP), CustomsOrg (MSP: CustomsOrgMSP)
+- Orderer: Raft
+- Channel: alphachannel
+- State DB: CouchDB
+
+Scripts:
+
+- network/scripts/start-network.sh
+- network/scripts/stop-network.sh
+
+## Prerequisites
+
+- Docker + Docker Compose
+- Node.js 20+ and npm
+- (Optional) Fabric CA client tools
+
+## Quick start (local dev)
+
+1) Clone and install deps
+
+```
+git clone https://github.com/Alpha6-dev/AlphaChain.git
+cd AlphaChain
+```
+
+2) Configure environment
+
+- Copy `.env.example` → `.env`
+- Copy `api/.env.example` → `api/.env`
+
+Change **all secrets** before any shared deployment:
+
+- JWT_SECRET / JWT_EXP_IN
+- DB passwords
+- Fabric CA URL / connection profile / wallet path
+
+Default API port is **3001**.
+
+3) Start the Fabric network
+
+```
+./network/scripts/start-network.sh
+```
+
+4) Run the API
+
+```
+cd api
 npm install
 npm run dev
+```
 
-# 5. Start the dashboard
+5) Run the dashboard
+
+```
 cd ../dashboard
 npm install
 npm run dev
 ```
 
-## Core Features
+## Typical shipment flow
 
-- **Shipment lifecycle tracking** — Create, update, complete shipment events on ledger
-- **Immutable event log** — Every custody change recorded on-chain
-- **Auto-release payment** — Smart contract releases payment on verified delivery confirmation
-- **QR code tracking** — Each shipment gets a unique QR code
-- **Role-based access** — Supplier / Transporter / Buyer / Customs / Admin
-- **AlphaChain Token (ACT)** — Utility token for platform transaction fees
+1) Origin creates shipment (AlphaOrg)
+2) Custody checkpoints update shipment status
+3) Authorized party confirms delivery
+4) Payment release event triggers
+5) Dashboard shows proof + history
 
-## API Endpoints
+## Security & roles
 
-| Method | Route | Description |
-|--------|-------|-------------|
-| POST | /api/shipments | Create a new shipment |
-| GET | /api/shipments/:id | Get shipment details |
-| PUT | /api/shipments/:id/status | Update shipment status |
-| POST | /api/shipments/:id/confirm | Confirm delivery (releases payment) |
-| GET | /api/shipments/:id/history | Get shipment ledger history |
-| GET | /api/shipments/:id/qrcode | Generate tracking QR code |
+- Chaincode enforces access control via MSP IDs and wallet identities
+- Use separate wallets per organization (see `api/.env.example`)
 
-## Roles
+## Troubleshooting
 
-| Role | Permissions |
-|------|------------|
-| Supplier | Create shipments, update status |
-| Transporter | Update shipment status, custody events |
-| Buyer | Confirm delivery (triggers payment release) |
-| Customs | Customs hold/clearance actions |
-| Admin | Full access |
+- Stop + restart network to recover from container failures
+- If wallet/connection profile mismatch, verify `FABRIC_CONNECTION_PROFILE`
+- Fix port conflicts by changing `PORT` in `api/.env`
 
-## License
+## Roadmap
 
-Proprietary — Alpha 6, Dakar, Senegal
+- TLS everywhere + k8s deployment
+- More stakeholders (port operator, airline, warehouse)
+- Analytics dashboards + audit exports
+- ACT fee modeling and mint/burn controls
