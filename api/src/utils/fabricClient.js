@@ -8,52 +8,55 @@ const logger = require('./logger');
 
 let gateway = null;
 let network = null;
-let contract = null;
+const contracts = {};
 
 /**
- * Connect to the Fabric network and return the shipment contract.
+ * Connect to the Fabric network and return a contract.
+ * @param {string} [chaincodeName] - Optional chaincode name. Defaults to config.fabric.chaincodeName.
  */
-async function getContract() {
-  if (contract) {
-    return contract;
+async function getContract(chaincodeName) {
+  const ccName = chaincodeName || config.fabric.chaincodeName;
+
+  if (contracts[ccName]) {
+    return contracts[ccName];
   }
 
-  // Load connection profile
-  const ccpPath = path.resolve(config.fabric.connectionProfile);
-  if (!fs.existsSync(ccpPath)) {
-    throw new Error(`Connection profile not found at ${ccpPath}`);
+  // Connect gateway if not connected
+  if (!gateway) {
+    const ccpPath = path.resolve(config.fabric.connectionProfile);
+    if (!fs.existsSync(ccpPath)) {
+      throw new Error(`Connection profile not found at ${ccpPath}`);
+    }
+    const ccp = JSON.parse(fs.readFileSync(ccpPath, 'utf8'));
+
+    const walletPath = path.resolve(config.fabric.walletPath);
+    const wallet = await Wallets.newFileSystemWallet(walletPath);
+
+    const identity = await wallet.get('appUser');
+    if (!identity) {
+      throw new Error(
+        'Identity "appUser" not found in wallet. Run the enrollment script first.'
+      );
+    }
+
+    gateway = new Gateway();
+    await gateway.connect(ccp, {
+      wallet,
+      identity: 'appUser',
+      discovery: { enabled: true, asLocalhost: true },
+    });
+
+    network = await gateway.getNetwork(config.fabric.channelName);
   }
-  const ccp = JSON.parse(fs.readFileSync(ccpPath, 'utf8'));
 
-  // Set up wallet
-  const walletPath = path.resolve(config.fabric.walletPath);
-  const wallet = await Wallets.newFileSystemWallet(walletPath);
+  contracts[ccName] = network.getContract(ccName);
 
-  // Check for user identity
-  const identity = await wallet.get('appUser');
-  if (!identity) {
-    throw new Error(
-      'Identity "appUser" not found in wallet. Run the enrollment script first.'
-    );
-  }
-
-  // Connect gateway
-  gateway = new Gateway();
-  await gateway.connect(ccp, {
-    wallet,
-    identity: 'appUser',
-    discovery: { enabled: true, asLocalhost: true },
-  });
-
-  network = await gateway.getNetwork(config.fabric.channelName);
-  contract = network.getContract(config.fabric.chaincodeName);
-
-  logger.info('Connected to Fabric network', {
+  logger.info('Connected to Fabric contract', {
     channel: config.fabric.channelName,
-    chaincode: config.fabric.chaincodeName,
+    chaincode: ccName,
   });
 
-  return contract;
+  return contracts[ccName];
 }
 
 /**
@@ -64,7 +67,7 @@ async function disconnect() {
     await gateway.disconnect();
     gateway = null;
     network = null;
-    contract = null;
+    Object.keys(contracts).forEach(k => delete contracts[k]);
     logger.info('Disconnected from Fabric network');
   }
 }
