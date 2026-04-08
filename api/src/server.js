@@ -14,6 +14,8 @@ const shipmentRoutes = require('./routes/shipments');
 const authRoutes = require('./routes/auth');
 const searchRoutes = require('./routes/search');
 const tokenRoutes = require('./routes/tokens');
+const analyticsRoutes = require('./routes/analytics');
+const auditRoutes = require('./routes/audit');
 const { disconnect } = require('./utils/fabricClient');
 const db = require('./db/pool');
 const { initDatabase } = require('./db/init');
@@ -52,6 +54,8 @@ app.use('/api/auth', authRoutes);
 app.use('/api/shipments', authenticate, shipmentRoutes);
 app.use('/api/search', authenticate, searchRoutes);
 app.use('/api/tokens', authenticate, tokenRoutes);
+app.use('/api/analytics', authenticate, analyticsRoutes);
+app.use('/api/audit', authenticate, auditRoutes);
 
 // --- Error handling ---
 app.use(errorHandler);
