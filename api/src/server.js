@@ -9,8 +9,11 @@ const rateLimit = require('express-rate-limit');
 const config = require('./config');
 const logger = require('./utils/logger');
 const errorHandler = require('./middleware/errorHandler');
+const { authenticate } = require('./middleware/auth');
 const shipmentRoutes = require('./routes/shipments');
+const authRoutes = require('./routes/auth');
 const { disconnect } = require('./utils/fabricClient');
+const db = require('./db/pool');
 
 const app = express();
 
@@ -42,7 +45,8 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-app.use('/api/shipments', shipmentRoutes);
+app.use('/api/auth', authRoutes);
+app.use('/api/shipments', authenticate, shipmentRoutes);
 
 // --- Error handling ---
 app.use(errorHandler);
@@ -59,6 +63,7 @@ const server = app.listen(config.port, () => {
 async function shutdown() {
   logger.info('Shutting down...');
   await disconnect();
+  await db.end();
   server.close(() => {
     logger.info('Server closed');
     process.exit(0);

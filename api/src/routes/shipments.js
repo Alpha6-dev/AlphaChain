@@ -5,6 +5,7 @@ const QRCode = require('qrcode');
 const { v4: uuidv4 } = require('uuid');
 const { getContract } = require('../utils/fabricClient');
 const logger = require('../utils/logger');
+const { authorize } = require('../middleware/authorize');
 
 const router = express.Router();
 
@@ -12,7 +13,7 @@ const router = express.Router();
  * POST /api/shipments
  * Create a new shipment on the ledger.
  */
-router.post('/', async (req, res, next) => {
+router.post('/', authorize('supplier', 'admin'), async (req, res, next) => {
   try {
     const {
       origin,
@@ -75,7 +76,7 @@ router.get('/:id', async (req, res, next) => {
  * PUT /api/shipments/:id/status
  * Update shipment status with a custody change event.
  */
-router.put('/:id/status', async (req, res, next) => {
+router.put('/:id/status', authorize('supplier', 'transporter', 'customs', 'port_operator', 'airline', 'warehouse', 'admin'), async (req, res, next) => {
   try {
     const { status, location, notes } = req.body;
 
@@ -112,7 +113,7 @@ router.put('/:id/status', async (req, res, next) => {
  * POST /api/shipments/:id/confirm
  * Confirm delivery — triggers payment release.
  */
-router.post('/:id/confirm', async (req, res, next) => {
+router.post('/:id/confirm', authorize('buyer', 'admin'), async (req, res, next) => {
   try {
     const { notes } = req.body;
     const contract = await getContract();
