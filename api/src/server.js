@@ -12,8 +12,10 @@ const errorHandler = require('./middleware/errorHandler');
 const { authenticate } = require('./middleware/auth');
 const shipmentRoutes = require('./routes/shipments');
 const authRoutes = require('./routes/auth');
+const searchRoutes = require('./routes/search');
 const { disconnect } = require('./utils/fabricClient');
 const db = require('./db/pool');
+const { initDatabase } = require('./db/init');
 
 const app = express();
 
@@ -47,11 +49,17 @@ app.get('/api/health', (req, res) => {
 
 app.use('/api/auth', authRoutes);
 app.use('/api/shipments', authenticate, shipmentRoutes);
+app.use('/api/search', authenticate, searchRoutes);
 
 // --- Error handling ---
 app.use(errorHandler);
 
 // --- Start server ---
+// Initialize database then start server
+initDatabase()
+  .then(() => logger.info('Database ready'))
+  .catch((err) => logger.warn('Database init skipped (PostgreSQL may not be running)', { error: err.message }));
+
 const server = app.listen(config.port, () => {
   logger.info(`AlphaChain API running on port ${config.port}`, {
     env: config.nodeEnv,

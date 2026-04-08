@@ -6,6 +6,7 @@ const { v4: uuidv4 } = require('uuid');
 const { getContract } = require('../utils/fabricClient');
 const logger = require('../utils/logger');
 const { authorize } = require('../middleware/authorize');
+const { syncShipment } = require('../db/shipmentSync');
 
 const router = express.Router();
 
@@ -46,6 +47,7 @@ router.post('/', authorize('supplier', 'admin'), async (req, res, next) => {
 
     const shipment = JSON.parse(result.toString());
     logger.info('Shipment created', { shipmentId });
+    syncShipment(shipment);
 
     res.status(201).json({ success: true, data: shipment });
   } catch (err) {
@@ -97,6 +99,7 @@ router.put('/:id/status', authorize('supplier', 'transporter', 'customs', 'port_
 
     const shipment = JSON.parse(result.toString());
     logger.info('Shipment status updated', { shipmentId: req.params.id, status });
+    syncShipment(shipment);
 
     res.json({ success: true, data: shipment });
   } catch (err) {
@@ -126,6 +129,7 @@ router.post('/:id/confirm', authorize('buyer', 'admin'), async (req, res, next) 
 
     const shipment = JSON.parse(result.toString());
     logger.info('Delivery confirmed, payment released', { shipmentId: req.params.id });
+    syncShipment(shipment);
 
     res.json({ success: true, data: shipment });
   } catch (err) {
