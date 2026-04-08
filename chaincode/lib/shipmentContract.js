@@ -6,6 +6,8 @@ const { Contract } = require('fabric-contract-api');
 const Status = {
   CREATED: 'CREATED',
   IN_TRANSIT: 'IN_TRANSIT',
+  AT_PORT: 'AT_PORT',
+  AT_WAREHOUSE: 'AT_WAREHOUSE',
   CUSTOMS_HOLD: 'CUSTOMS_HOLD',
   CUSTOMS_CLEARED: 'CUSTOMS_CLEARED',
   OUT_FOR_DELIVERY: 'OUT_FOR_DELIVERY',
@@ -16,7 +18,9 @@ const Status = {
 // Valid status transitions
 const VALID_TRANSITIONS = {
   [Status.CREATED]: [Status.IN_TRANSIT],
-  [Status.IN_TRANSIT]: [Status.CUSTOMS_HOLD, Status.OUT_FOR_DELIVERY],
+  [Status.IN_TRANSIT]: [Status.CUSTOMS_HOLD, Status.AT_PORT, Status.AT_WAREHOUSE, Status.OUT_FOR_DELIVERY],
+  [Status.AT_PORT]: [Status.CUSTOMS_HOLD, Status.IN_TRANSIT],
+  [Status.AT_WAREHOUSE]: [Status.IN_TRANSIT, Status.OUT_FOR_DELIVERY],
   [Status.CUSTOMS_HOLD]: [Status.CUSTOMS_CLEARED],
   [Status.CUSTOMS_CLEARED]: [Status.OUT_FOR_DELIVERY],
   [Status.OUT_FOR_DELIVERY]: [Status.DELIVERED],
@@ -26,8 +30,9 @@ const VALID_TRANSITIONS = {
 // Roles that can perform specific actions
 const ROLE_PERMISSIONS = {
   createShipment: ['supplier', 'admin'],
-  updateStatus: ['supplier', 'transporter', 'customs', 'admin'],
+  updateStatus: ['supplier', 'transporter', 'customs', 'port_operator', 'airline', 'warehouse', 'admin'],
   confirmDelivery: ['buyer', 'admin'],
+  warehouseOps: ['warehouse', 'admin'],
 };
 
 class ShipmentContract extends Contract {
@@ -265,6 +270,78 @@ class ShipmentContract extends Contract {
     await iterator.close();
 
     return JSON.stringify(shipments);
+  }
+
+  /**
+   * WarehouseCheckIn — Record goods arriving at a warehouse.
+   */
+  async WarehouseCheckIn(ctx, shipmentId, warehouseId, location, notes) {
+    this._checkRole(ctx, ROLE_PERMISSIONS.warehouseOps);
+
+    const shipment = await this._getShipmentOrThrow(ctx, shipmentId);
+
+    if (shipment.status !== Status.IN_TRANSIT) {
+      throw new Error(`Shipment must be IN_TRANSIT for warehouse check-in. Current: ${shipment.status}`);
+    }
+
+    const timestamp = ctx.stub.getTxTimestamp();
+    const updatedAt = new Date(timestamp.seconds.low * 1000).toISOString();
+
+    shipment.status = Status.AT_WAREHOUSE;
+    shipment.warehouseId = warehouseId;
+    shipment.updatedAt = updatedAt;
+    shipment.events.push({
+      status: Status.AT_WAREHOUSE,
+      timestamp: updatedAt,
+      actor: this._getClientIdentity(ctx),
+      location,
+      notes: notes || `Checked into warehouse ${warehouseId}`,
+    });
+
+    await ctx.stub.putState(shipmentId, Buffer.from(JSON.stringify(shipment)));
+
+    ctx.stub.setEvent('WarehouseCheckIn', Buffer.from(JSON.stringify({
+      shipmentId,
+      warehouseId,
+      location,
+    })));
+
+    return JSON.stringify(shipment);
+  }
+
+  /**
+   * WarehouseCheckOut — Record goods leaving a warehouse.
+   */
+  async WarehouseCheckOut(ctx, shipmentId, notes) {
+    this._checkRole(ctx, ROLE_PERMISSIONS.warehouseOps);
+
+    const shipment = await this._getShipmentOrThrow(ctx, shipmentId);
+
+    if (shipment.status !== Status.AT_WAREHOUSE) {
+      throw new Error(`Shipment must be AT_WAREHOUSE for check-out. Current: ${shipment.status}`);
+    }
+
+    const timestamp = ctx.stub.getTxTimestamp();
+    const updatedAt = new Date(timestamp.seconds.low * 1000).toISOString();
+
+    shipment.status = Status.OUT_FOR_DELIVERY;
+    shipment.updatedAt = updatedAt;
+    shipment.events.push({
+      status: Status.OUT_FOR_DELIVERY,
+      timestamp: updatedAt,
+      actor: this._getClientIdentity(ctx),
+      location: shipment.destination,
+      notes: notes || `Checked out of warehouse ${shipment.warehouseId}`,
+    });
+
+    await ctx.stub.putState(shipmentId, Buffer.from(JSON.stringify(shipment)));
+
+    ctx.stub.setEvent('WarehouseCheckOut', Buffer.from(JSON.stringify({
+      shipmentId,
+      warehouseId: shipment.warehouseId,
+    })));
+
+    return JSON.stringify(shipment);
   }
 
   // --- Internal helpers ---

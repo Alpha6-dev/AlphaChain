@@ -5,6 +5,7 @@ const { Contract } = require('fabric-contract-api');
 // Composite key prefixes
 const BALANCE_PREFIX = 'balance';
 const ALLOWANCE_PREFIX = 'allowance';
+const ESCROW_PREFIX = 'escrow';
 
 class ACTContract extends Contract {
   constructor() {
@@ -129,6 +130,81 @@ class ACTContract extends Contract {
   async TokenSymbol(ctx) {
     const symbol = await ctx.stub.getState('tokenSymbol');
     return symbol ? symbol.toString() : '';
+  }
+
+  /**
+   * EscrowDeposit — Lock tokens in escrow for a shipment.
+   */
+  async EscrowDeposit(ctx, shipmentId, amount) {
+    const depositor = ctx.clientIdentity.getID();
+    const amountInt = parseInt(amount, 10);
+
+    if (amountInt <= 0) {
+      throw new Error('Escrow amount must be positive');
+    }
+
+    const balance = await this._getBalance(ctx, depositor);
+    if (balance < amountInt) {
+      throw new Error(`Insufficient balance for escrow. Have: ${balance}, need: ${amountInt}`);
+    }
+
+    // Debit depositor
+    await this._setBalance(ctx, depositor, balance - amountInt);
+
+    // Store escrow
+    const escrowKey = ctx.stub.createCompositeKey(ESCROW_PREFIX, [shipmentId]);
+    const existing = await ctx.stub.getState(escrowKey);
+    const currentEscrow = (existing && existing.length > 0) ? parseInt(existing.toString(), 10) : 0;
+    await ctx.stub.putState(escrowKey, Buffer.from((currentEscrow + amountInt).toString()));
+
+    ctx.stub.setEvent('EscrowDeposited', Buffer.from(JSON.stringify({
+      shipmentId,
+      depositor,
+      amount: amountInt,
+    })));
+
+    return JSON.stringify({ shipmentId, depositor, amount: amountInt, totalEscrow: currentEscrow + amountInt });
+  }
+
+  /**
+   * EscrowRelease — Release escrowed tokens to a recipient.
+   */
+  async EscrowRelease(ctx, shipmentId, recipient) {
+    this._requireMinter(ctx);
+
+    const escrowKey = ctx.stub.createCompositeKey(ESCROW_PREFIX, [shipmentId]);
+    const data = await ctx.stub.getState(escrowKey);
+
+    if (!data || data.length === 0) {
+      throw new Error(`No escrow found for shipment ${shipmentId}`);
+    }
+
+    const escrowAmount = parseInt(data.toString(), 10);
+
+    // Credit recipient
+    const recipientBalance = await this._getBalance(ctx, recipient);
+    await this._setBalance(ctx, recipient, recipientBalance + escrowAmount);
+
+    // Clear escrow
+    await ctx.stub.putState(escrowKey, Buffer.from('0'));
+
+    ctx.stub.setEvent('EscrowReleased', Buffer.from(JSON.stringify({
+      shipmentId,
+      recipient,
+      amount: escrowAmount,
+    })));
+
+    return JSON.stringify({ shipmentId, recipient, amount: escrowAmount });
+  }
+
+  /**
+   * EscrowBalance — Query escrow amount for a shipment.
+   */
+  async EscrowBalance(ctx, shipmentId) {
+    const escrowKey = ctx.stub.createCompositeKey(ESCROW_PREFIX, [shipmentId]);
+    const data = await ctx.stub.getState(escrowKey);
+    const amount = (data && data.length > 0) ? parseInt(data.toString(), 10) : 0;
+    return JSON.stringify({ shipmentId, escrowAmount: amount });
   }
 
   // --- Internal helpers ---

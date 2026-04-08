@@ -13,6 +13,7 @@ const { authenticate } = require('./middleware/auth');
 const shipmentRoutes = require('./routes/shipments');
 const authRoutes = require('./routes/auth');
 const searchRoutes = require('./routes/search');
+const tokenRoutes = require('./routes/tokens');
 const { disconnect } = require('./utils/fabricClient');
 const db = require('./db/pool');
 const { initDatabase } = require('./db/init');
@@ -50,6 +51,7 @@ app.get('/api/health', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/shipments', authenticate, shipmentRoutes);
 app.use('/api/search', authenticate, searchRoutes);
+app.use('/api/tokens', authenticate, tokenRoutes);
 
 // --- Error handling ---
 app.use(errorHandler);

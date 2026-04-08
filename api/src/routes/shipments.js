@@ -186,4 +186,65 @@ router.get('/:id/qrcode', async (req, res, next) => {
   }
 });
 
+/**
+ * POST /api/shipments/:id/warehouse-checkin
+ * Record goods arriving at a warehouse.
+ */
+router.post('/:id/warehouse-checkin', authorize('warehouse', 'admin'), async (req, res, next) => {
+  try {
+    const { warehouseId, location, notes } = req.body;
+
+    if (!warehouseId || !location) {
+      const err = new Error('Missing required fields: warehouseId, location');
+      err.statusCode = 400;
+      throw err;
+    }
+
+    const contract = await getContract();
+    const result = await contract.submitTransaction(
+      'WarehouseCheckIn',
+      req.params.id,
+      warehouseId,
+      location,
+      notes || ''
+    );
+
+    const shipment = JSON.parse(result.toString());
+    logger.info('Warehouse check-in', { shipmentId: req.params.id, warehouseId });
+    syncShipment(shipment);
+
+    res.json({ success: true, data: shipment });
+  } catch (err) {
+    if (err.message.includes('does not exist')) err.statusCode = 404;
+    if (err.message.includes('must be IN_TRANSIT')) err.statusCode = 400;
+    next(err);
+  }
+});
+
+/**
+ * POST /api/shipments/:id/warehouse-checkout
+ * Record goods leaving a warehouse.
+ */
+router.post('/:id/warehouse-checkout', authorize('warehouse', 'admin'), async (req, res, next) => {
+  try {
+    const { notes } = req.body;
+    const contract = await getContract();
+    const result = await contract.submitTransaction(
+      'WarehouseCheckOut',
+      req.params.id,
+      notes || ''
+    );
+
+    const shipment = JSON.parse(result.toString());
+    logger.info('Warehouse check-out', { shipmentId: req.params.id });
+    syncShipment(shipment);
+
+    res.json({ success: true, data: shipment });
+  } catch (err) {
+    if (err.message.includes('does not exist')) err.statusCode = 404;
+    if (err.message.includes('must be AT_WAREHOUSE')) err.statusCode = 400;
+    next(err);
+  }
+});
+
 module.exports = router;
