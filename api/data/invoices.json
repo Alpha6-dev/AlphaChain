@@ -1,0 +1,22 @@
+[
+  {
+    "id": "INV-01DD5525",
+    "filename": "1775651427587-facture-whatsapp.pdf",
+    "originalName": "facture-whatsapp.pdf",
+    "size": 26,
+    "mimetype": "application/pdf",
+    "source": "whatsapp",
+    "status": "received",
+    "receivedAt": "2026-04-08T12:30:27.590Z"
+  },
+  {
+    "id": "INV-A0FFB288",
+    "filename": "1775651401682-test-invoice.pdf",
+    "originalName": "test-invoice.pdf",
+    "size": 30,
+    "mimetype": "application/pdf",
+    "source": "email",
+    "status": "received",
+    "receivedAt": "2026-04-08T12:30:01.690Z"
+  }
+]

@@ -35,4 +35,22 @@ export async function confirmDelivery(id, notes) {
   return data.data;
 }
 
+// --- Invoice endpoints ---
+
+export async function fetchInvoices(source) {
+  const params = source ? { source } : {};
+  const { data } = await api.get('/invoices', { params });
+  return data.data;
+}
+
+export async function fetchInvoice(id) {
+  const { data } = await api.get(`/invoices/${id}`);
+  return data.data;
+}
+
+export async function fetchInvoiceStats() {
+  const { data } = await api.get('/invoices/stats');
+  return data.data;
+}
+
 export default api;

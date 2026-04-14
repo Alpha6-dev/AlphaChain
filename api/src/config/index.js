@@ -28,5 +28,10 @@ module.exports = {
     expiresIn: process.env.JWT_EXPIRES_IN || '24h',
   },
 
+  invoices: {
+    dataPath: process.env.INVOICE_DATA_PATH || './data/invoices.json',
+    uploadPath: process.env.INVOICE_UPLOAD_PATH || './uploads/invoices',
+  },
+
   logLevel: process.env.LOG_LEVEL || 'info',
 };

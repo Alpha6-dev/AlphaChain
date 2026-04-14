@@ -5,14 +5,17 @@
   "main": "index.js",
   "scripts": {
     "start": "fabric-chaincode-node start",
-    "test": "jest --coverage"
+    "test": "jest --coverage",
+    "lint": "eslint ."
   },
   "dependencies": {
-    "fabric-contract-api": "^2.5.0",
-    "fabric-shim": "^2.5.0"
+    "fabric-contract-api": "^2.5.0"
   },
   "devDependencies": {
     "jest": "^29.7.0"
+  },
+  "jest": {
+    "testEnvironment": "node"
   },
   "engines": {
     "node": ">=18.0.0"

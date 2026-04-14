@@ -133,6 +133,7 @@ class ShipmentContract extends Contract {
       );
     }
 
+    const previousStatus = shipment.status;
     const timestamp = ctx.stub.getTxTimestamp();
     const updatedAt = new Date(timestamp.seconds.low * 1000).toISOString();
 
@@ -150,7 +151,7 @@ class ShipmentContract extends Contract {
 
     ctx.stub.setEvent('ShipmentStatusUpdated', Buffer.from(JSON.stringify({
       shipmentId,
-      previousStatus: shipment.status,
+      previousStatus,
       newStatus,
       location,
     })));
@@ -190,17 +191,14 @@ class ShipmentContract extends Contract {
 
     await ctx.stub.putState(shipmentId, Buffer.from(JSON.stringify(shipment)));
 
-    // Emit payment release event for off-chain payment processor
-    ctx.stub.setEvent('PaymentReleased', Buffer.from(JSON.stringify({
-      shipmentId,
-      supplierId: shipment.supplierId,
-      buyerId: shipment.buyerId,
-      paymentAmount: shipment.paymentAmount,
-    })));
-
+    // Fabric only honours the last setEvent call per transaction — combine into one event
     ctx.stub.setEvent('DeliveryConfirmed', Buffer.from(JSON.stringify({
       shipmentId,
       confirmedAt: updatedAt,
+      supplierId: shipment.supplierId,
+      buyerId: shipment.buyerId,
+      paymentAmount: shipment.paymentAmount,
+      paymentReleased: true,
     })));
 
     return JSON.stringify(shipment);

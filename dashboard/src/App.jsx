@@ -1,11 +1,14 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Routes, Route, Link, useLocation } from 'react-router-dom';
 import ShipmentList from './pages/ShipmentList';
 import ShipmentDetail from './pages/ShipmentDetail';
+import InvoiceList from './pages/InvoiceList';
+import { fetchInvoiceStats } from './utils/api';
 
 const NAV_ITEMS = [
   { path: '/', label: 'Dashboard' },
   { path: '/shipments', label: 'Shipments' },
+  { path: '/invoices', label: 'Invoices' },
 ];
 
 function Sidebar() {
@@ -20,7 +23,7 @@ function Sidebar() {
       <nav className="flex-1 p-4 space-y-1">
         {NAV_ITEMS.map(({ path, label }) => {
           const active = location.pathname === path ||
-            (path === '/shipments' && location.pathname.startsWith('/shipments'));
+            (path !== '/' && location.pathname.startsWith(path));
           return (
             <Link
               key={path}
@@ -52,6 +55,7 @@ export default function App() {
           <Route path="/" element={<DashboardHome />} />
           <Route path="/shipments" element={<ShipmentList />} />
           <Route path="/shipments/:id" element={<ShipmentDetail />} />
+          <Route path="/invoices" element={<InvoiceList />} />
         </Routes>
       </main>
     </div>
@@ -59,21 +63,73 @@ export default function App() {
 }
 
 function DashboardHome() {
+  const [stats, setStats] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      try {
+        const data = await fetchInvoiceStats();
+        if (!cancelled) setStats(data);
+      } catch {
+        // API not available
+      }
+    }
+    load();
+    return () => { cancelled = true; };
+  }, []);
+
+  const total = stats?.total ?? '--';
+  const emailCount = stats?.bySource?.email ?? '--';
+  const whatsappCount = stats?.bySource?.whatsapp ?? '--';
+
   return (
     <div>
       <h2 className="text-2xl font-bold mb-6">Dashboard</h2>
 
+      {/* Shipment Stats */}
+      <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">Shipments</h3>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <StatCard label="Active Shipments" value="--" color="bg-blue-500" />
         <StatCard label="In Transit" value="--" color="bg-yellow-500" />
         <StatCard label="Delivered" value="--" color="bg-green-500" />
       </div>
 
+      {/* Invoice Stats */}
+      <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">Invoices</h3>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <StatCard label="Total Invoices" value={total} color="bg-purple-500" />
+        <StatCard label="Via Email" value={emailCount} color="bg-blue-500" />
+        <StatCard label="Via WhatsApp" value={whatsappCount} color="bg-green-500" />
+      </div>
+
+      {/* Recent Invoices */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-        <h3 className="text-lg font-semibold mb-4">Recent Activity</h3>
-        <p className="text-gray-500 text-sm">
-          Connect to the Fabric network to see live shipment data.
-        </p>
+        <h3 className="text-lg font-semibold mb-4">Recent Invoices</h3>
+        {stats?.recent && stats.recent.length > 0 ? (
+          <div className="space-y-3">
+            {stats.recent.map((inv) => (
+              <div key={inv.id} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
+                <div className="flex items-center gap-3">
+                  <span className={`w-2 h-2 rounded-full ${inv.source === 'email' ? 'bg-blue-500' : 'bg-green-500'}`} />
+                  <div>
+                    <p className="text-sm font-medium text-gray-800">{inv.originalName}</p>
+                    <p className="text-xs text-gray-400">
+                      {inv.id} &middot; {new Date(inv.receivedAt).toLocaleDateString()}
+                    </p>
+                  </div>
+                </div>
+                <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded capitalize">
+                  {inv.source}
+                </span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-gray-500 text-sm">
+            {stats ? 'No invoices received yet.' : 'Connect the API to see invoice data.'}
+          </p>
+        )}
       </div>
     </div>
   );

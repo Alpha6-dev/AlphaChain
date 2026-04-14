@@ -8,4 +8,5 @@ crypto-config/ordererOrganizations/
 crypto-config/peerOrganizations/
 channel-artifacts/genesis.block
 channel-artifacts/*.tx
+uploads/
 .DS_Store
