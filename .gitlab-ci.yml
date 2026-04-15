@@ -13,13 +13,13 @@ stages:
 variables:
   NODE_IMAGE: node:20-alpine
 
-# ── Build ──────────────────────────────────────────────
+# ── Build ────────────────────────────────────────────────
 build:
   stage: build
   image: $NODE_IMAGE
   script:
     - cd api
-    - npm ci
+    - npm install
   cache:
     key: ${CI_COMMIT_REF_SLUG}-api
     paths:
@@ -29,7 +29,7 @@ build:
       - api/node_modules/
     expire_in: 1 hour
 
-# ── Test (Jest) ────────────────────────────────────────
+# ── Test (Jest) ──────────────────────────────────────────
 test:
   stage: test
   image: $NODE_IMAGE
@@ -43,7 +43,7 @@ test:
       - api/node_modules/
     policy: pull
 
-# ── Docker ─────────────────────────────────────────────
+# ── Docker ───────────────────────────────────────────────
 docker:
   stage: docker
   image: docker:27
@@ -60,7 +60,7 @@ docker:
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
 
-# ── Deploy ─────────────────────────────────────────────
+# ── Deploy ───────────────────────────────────────────────
 staging:
   stage: deploy
   image: alpine:latest
