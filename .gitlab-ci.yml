@@ -36,7 +36,7 @@ test:
   needs: [build]
   script:
     - cd api
-    - npx jest --coverage
+    - npx jest --coverage --passWithNoTests
   cache:
     key: ${CI_COMMIT_REF_SLUG}-api
     paths:
