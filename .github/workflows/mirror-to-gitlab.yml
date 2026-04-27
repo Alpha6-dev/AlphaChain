@@ -5,6 +5,7 @@ on:
     branches: ['**']
     tags: ['**']
   delete:
+  workflow_dispatch:
 
 concurrency:
   group: mirror-to-gitlab
