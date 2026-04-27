@@ -20,7 +20,9 @@ jobs:
           fetch-depth: 0
       - name: Push to GitLab
         env:
-          GL_USER: oauth2
-          GL_TOKEN: ${{ secrets.GITLAB_TOKEN }}
+          GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
         run: |
-          git push --mirror "https://${GL_USER}:${GL_TOKEN}@gitlab.com/alpha6-dev-group/AlphaChain.git"
+          umask 077
+          printf 'machine gitlab.com\nlogin oauth2\npassword %s\n' "${GITLAB_TOKEN}" > "${HOME}/.netrc"
+          git push --mirror https://gitlab.com/alpha6-dev-group/AlphaChain.git
+          rm -f "${HOME}/.netrc"
